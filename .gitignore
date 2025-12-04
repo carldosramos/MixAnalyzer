@@ -42,4 +42,6 @@ next-env.d.ts
 
 # uploads
 backend/uploads/
-backend/target
+
+# rust
+backend/target/
