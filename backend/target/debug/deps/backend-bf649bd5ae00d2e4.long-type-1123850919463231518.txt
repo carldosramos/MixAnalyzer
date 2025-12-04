@@ -1,0 +1,2 @@
+Pin<Box<dyn tokio_stream::Stream<Item = Result<std::string::String, std::string::String>> + std::marker::Send>>
+Box<futures::stream::FlatMap<impl tokio_stream::Stream<Item = Result<bytes::Bytes, reqwest::Error>>, futures::stream::Iter<std::vec::IntoIter<Result<std::string::String, std::string::String>>>, {closure@src/main.rs:288:34: 288:45}>>

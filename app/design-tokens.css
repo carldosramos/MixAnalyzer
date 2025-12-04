@@ -51,4 +51,32 @@
   --shadow-strong: 0 20px 45px rgba(20, 24, 45, 0.18);
 }
 
-/* No light-mode override: app defaults to dark palette */
+/* Light mode palette */
+.light {
+  --color-background: #f5f7ff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #e8eaf0;
+  --color-surface-gradient: linear-gradient(
+    145deg,
+    #ffffff 20%,
+    #f8f9fc 50%,
+    #ffffff 80%
+  );
+  --color-surface-gradient-muted: linear-gradient(
+    135deg,
+    #e8eaf0 20%,
+    #eceef5 50%,
+    #e8eaf0 80%
+  );
+  --color-text: #1a1a2e;
+  --color-text-muted: #5a5d7a;
+  --color-border: #d4d8e8;
+  --color-primary: #7c3aed;
+  --color-primary-strong: #6d28d9;
+  --color-primary-soft: #ede9fe;
+  --color-accent: #0d9488;
+  --color-danger: #e11d48;
+
+  --shadow-soft: 0 10px 30px rgba(100, 116, 160, 0.1);
+  --shadow-strong: 0 20px 45px rgba(100, 116, 160, 0.15);
+}

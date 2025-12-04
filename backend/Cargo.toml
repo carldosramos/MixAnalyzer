@@ -29,3 +29,8 @@ uuid = { version = "1", features = ["serde", "v4"] }
 tokio-stream = "0.1.17"
 futures-util = "0.3.31"
 futures = "0.3.31"
+
+# Audio Analysis
+symphonia = { version = "0.5", features = ["all"] }
+spectrum-analyzer = "1.4"
+async-stream = "0.3.6"

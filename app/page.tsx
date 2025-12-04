@@ -1,8 +1,5 @@
-import ChatPage from "../features/chat/components/ChatPage";
-import { getCachedChatSessions } from "../features/chat/server-api";
+import MixAnalyzerPage from "../features/mix-analyzer/components/MixAnalyzerPage";
 
-export default async function Page() {
-  const chats = await getCachedChatSessions();
-
-  return <ChatPage initialChats={chats} />;
+export default function Page() {
+  return <MixAnalyzerPage />;
 }
