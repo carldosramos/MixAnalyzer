@@ -14,6 +14,7 @@ import {
 import { WaveformPlayer } from "./WaveformPlayer";
 import { FrequencyAnalyzer } from "./FrequencyAnalyzer";
 import { StemMetricsDisplay } from "./StemMetricsDisplay";
+import { StereoImager } from "./StereoImager";
 import {
   FrequencyMetrics,
   formatFrequency,
@@ -97,6 +98,14 @@ export function StemAnalysisTab({
   const [selectedStem, setSelectedStem] = useState<StemName>("vocals");
   const [mixAnalyser, setMixAnalyser] = useState<AnalyserNode | null>(null);
   const [refAnalyser, setRefAnalyser] = useState<AnalyserNode | null>(null);
+  const [mixStereo, setMixStereo] = useState<{
+    left: AnalyserNode;
+    right: AnalyserNode;
+  } | null>(null);
+  const [refStereo, setRefStereo] = useState<{
+    left: AnalyserNode;
+    right: AnalyserNode;
+  } | null>(null);
   const [mixPlaying, setMixPlaying] = useState(false);
   const [refPlaying, setRefPlaying] = useState(false);
 
@@ -156,6 +165,8 @@ export function StemAnalysisTab({
     setRefPlaying(false);
     setMixAnalyser(null);
     setRefAnalyser(null);
+    setMixStereo(null);
+    setRefStereo(null);
     setMixMetrics(null);
     setRefMetrics(null);
   }, [selectedStem]);
@@ -301,6 +312,7 @@ export function StemAnalysisTab({
             } Stem`}
             color={selectedColor.hex}
             onAnalyser={setMixAnalyser}
+            onStereoAnalyser={(left, right) => setMixStereo({ left, right })}
             onPlay={() => setMixPlaying(true)}
             onPause={() => setMixPlaying(false)}
           />
@@ -313,6 +325,15 @@ export function StemAnalysisTab({
             color={selectedColor.hex}
             height={180}
             onMetricsComputed={setMixMetrics}
+          />
+
+          {/* Stereo Imager */}
+          <StereoImager
+            leftAnalyser={mixStereo?.left || null}
+            rightAnalyser={mixStereo?.right || null}
+            isPlaying={mixPlaying}
+            color={selectedColor.hex}
+            height={180}
           />
         </div>
 
@@ -332,6 +353,7 @@ export function StemAnalysisTab({
             } Stem`}
             color="#10b981"
             onAnalyser={setRefAnalyser}
+            onStereoAnalyser={(left, right) => setRefStereo({ left, right })}
             onPlay={() => setRefPlaying(true)}
             onPause={() => setRefPlaying(false)}
           />
@@ -344,6 +366,15 @@ export function StemAnalysisTab({
             color="#10b981"
             height={180}
             onMetricsComputed={setRefMetrics}
+          />
+
+          {/* Stereo Imager */}
+          <StereoImager
+            leftAnalyser={refStereo?.left || null}
+            rightAnalyser={refStereo?.right || null}
+            isPlaying={refPlaying}
+            color="#10b981"
+            height={180}
           />
         </div>
       </div>

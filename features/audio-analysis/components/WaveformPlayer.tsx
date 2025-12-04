@@ -12,6 +12,7 @@ interface WaveformPlayerProps {
   onPause?: () => void;
   onTimeUpdate?: (currentTime: number) => void;
   onAnalyser?: (analyser: AnalyserNode) => void;
+  onStereoAnalyser?: (left: AnalyserNode, right: AnalyserNode) => void;
 }
 
 export function WaveformPlayer({
@@ -23,12 +24,17 @@ export function WaveformPlayer({
   onPause,
   onTimeUpdate,
   onAnalyser,
+  onStereoAnalyser,
 }: WaveformPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const stereoAnalysersRef = useRef<{
+    left: AnalyserNode;
+    right: AnalyserNode;
+  } | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const animationRef = useRef<number>(0);
 
@@ -137,20 +143,44 @@ export function WaveformPlayer({
 
       const audioContext = audioContextRef.current;
 
-      // Create analyser
+      // Create analysers
       if (!analyserRef.current) {
+        // Main mono analyser for frequency graph
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
         analyser.smoothingTimeConstant = 0.8;
         analyserRef.current = analyser;
       }
 
+      if (!stereoAnalysersRef.current) {
+        // Stereo analysers for vectorscope
+        const left = audioContext.createAnalyser();
+        const right = audioContext.createAnalyser();
+        left.fftSize = 2048;
+        left.smoothingTimeConstant = 0.8;
+        right.fftSize = 2048;
+        right.smoothingTimeConstant = 0.8;
+        stereoAnalysersRef.current = { left, right };
+      }
+
       // Connect source only once per audio element
       if (!sourceRef.current) {
         try {
           const source = audioContext.createMediaElementSource(audio);
+
+          // 1. Connect to main analyser (mono mix)
           source.connect(analyserRef.current);
           analyserRef.current.connect(audioContext.destination);
+
+          // 2. Connect to stereo analysers via splitter
+          const splitter = audioContext.createChannelSplitter(2);
+          source.connect(splitter);
+
+          if (stereoAnalysersRef.current) {
+            splitter.connect(stereoAnalysersRef.current.left, 0);
+            splitter.connect(stereoAnalysersRef.current.right, 1);
+          }
+
           sourceRef.current = source;
         } catch (e) {
           // Already connected - that's fine
@@ -162,10 +192,17 @@ export function WaveformPlayer({
       if (onAnalyser && analyserRef.current) {
         onAnalyser(analyserRef.current);
       }
+
+      if (onStereoAnalyser && stereoAnalysersRef.current) {
+        onStereoAnalyser(
+          stereoAnalysersRef.current.left,
+          stereoAnalysersRef.current.right
+        );
+      }
     } catch (e) {
-      console.error("Failed to init audio context:", e);
+      console.error("Audio context error:", e);
     }
-  }, [onAnalyser]);
+  }, [onAnalyser, onStereoAnalyser]);
 
   // Draw static waveform with playback position
   const drawWaveform = useCallback(() => {
