@@ -1,2 +1,0 @@
-Pin<Box<dyn tokio_stream::Stream<Item = Result<std::string::String, std::string::String>> + std::marker::Send>>
-Pin<Box<dyn tokio_stream::Stream<Item = Result<std::string::String, std::string::String>> + std::marker::Send>>: Encode<'_, Postgres>
