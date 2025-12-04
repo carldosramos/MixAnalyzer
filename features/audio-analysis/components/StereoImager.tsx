@@ -23,8 +23,8 @@ export function StereoImager({
   const animationRef = useRef<number>(0);
 
   // Buffers for audio data
-  const leftDataRef = useRef<Float32Array | null>(null);
-  const rightDataRef = useRef<Float32Array | null>(null);
+  const leftDataRef = useRef<Float32Array<ArrayBuffer> | null>(null);
+  const rightDataRef = useRef<Float32Array<ArrayBuffer> | null>(null);
 
   // Metrics
   const [correlation, setCorrelation] = useState(0);
@@ -33,8 +33,12 @@ export function StereoImager({
   // Initialize buffers
   useEffect(() => {
     if (leftAnalyser && rightAnalyser) {
-      leftDataRef.current = new Float32Array(leftAnalyser.frequencyBinCount);
-      rightDataRef.current = new Float32Array(rightAnalyser.frequencyBinCount);
+      leftDataRef.current = new Float32Array(
+        leftAnalyser.frequencyBinCount
+      ) as Float32Array<ArrayBuffer>;
+      rightDataRef.current = new Float32Array(
+        rightAnalyser.frequencyBinCount
+      ) as Float32Array<ArrayBuffer>;
     }
   }, [leftAnalyser, rightAnalyser]);
 

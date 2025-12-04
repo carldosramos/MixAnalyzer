@@ -540,6 +540,42 @@ async fn stem_job_status_stream(
                     }
                 }
                 None => {
+                    // Fallback: Check if stems exist on disk (persistence)
+                    let upload_dir = &state.upload_dir;
+                    let stem_dir = PathBuf::from(upload_dir).join("stems").join(&stem_job_id);
+                    let mix_dir = stem_dir.join("mix");
+                    
+                    if mix_dir.exists() {
+                        // Reconstruct completed status from files
+                        let mut stems = HashMap::new();
+                        
+                        // Helper to add stem if exists
+                        let mut add_stem = |name: &str, dir: &PathBuf| {
+                            let path = dir.join(format!("{}.wav", name));
+                            if path.exists() {
+                                stems.insert(name.to_string(), StemMetrics {
+                                    file_path: path.to_string_lossy().to_string(),
+                                    integrated_lufs: -14.0, // Placeholder
+                                    spectral_centroid: 2000.0,
+                                    spectral_rolloff: 8000.0,
+                                });
+                            }
+                        };
+
+                        // Check mix stems
+                        add_stem("drums", &mix_dir);
+                        add_stem("bass", &mix_dir);
+                        add_stem("other", &mix_dir);
+                        add_stem("vocals", &mix_dir);
+
+                        if !stems.is_empty() {
+                            let status = StemJobStatus::Completed(StemAnalysisResult { stems });
+                            let json = serde_json::to_string(&status).unwrap();
+                            yield Ok(Event::default().data(&json));
+                            break;
+                        }
+                    }
+
                     yield Ok(Event::default().data(json!({ "status": "Failed", "data": "Stem job not found" }).to_string()));
                     break;
                 }

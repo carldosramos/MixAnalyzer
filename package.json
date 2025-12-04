@@ -6,8 +6,12 @@
     "dev": "concurrently \"npm run dev:front\" \"npm run dev:back\"",
     "dev:front": "next dev",
     "dev:back": "cd backend && watchexec -r -e rs 'cargo run'",
-    "build": "next build",
-    "start": "next start",
+    "build": "concurrently \"npm run build:front\" \"npm run build:back\"",
+    "build:front": "next build",
+    "build:back": "cd backend && cargo build --release",
+    "start": "concurrently \"npm run start:front\" \"npm run start:back\"",
+    "start:front": "next start",
+    "start:back": "cd backend && ./target/release/backend",
     "lint": "next lint"
   },
   "dependencies": {
