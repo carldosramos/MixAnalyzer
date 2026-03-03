@@ -1,60 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { FaPlus, FaFolder, FaClock, FaArrowRight } from "react-icons/fa";
 import { ThemeToggle } from "../../theme/components/ThemeToggle";
-
-interface Project {
-  id: string;
-  name: string;
-  created_at: string;
-}
+import { useProjects, useCreateProject } from "@/lib/queries";
 
 export function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchProjects = async () => {
-    try {
-      const res = await fetch("http://127.0.0.1:4000/api/projects");
-      if (res.ok) {
-        const data = await res.json();
-        setProjects(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch projects", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: projects = [], isLoading } = useProjects();
+  const createProject = useCreateProject();
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjectName.trim()) return;
-
-    try {
-      const res = await fetch("http://127.0.0.1:4000/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newProjectName }),
-      });
-
-      if (res.ok) {
-        const project = await res.json();
-        setProjects([project, ...projects]);
-        setNewProjectName("");
-        setIsCreating(false);
-      }
-    } catch (error) {
-      console.error("Failed to create project", error);
-    }
+    await createProject.mutateAsync(newProjectName.trim());
+    setNewProjectName("");
+    setIsCreating(false);
   };
 
   return (
@@ -92,9 +56,10 @@ export function Dashboard() {
             />
             <button
               type="submit"
-              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold"
+              disabled={createProject.isPending}
+              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold disabled:opacity-50"
             >
-              Create
+              {createProject.isPending ? "Creating..." : "Create"}
             </button>
             <button
               type="button"

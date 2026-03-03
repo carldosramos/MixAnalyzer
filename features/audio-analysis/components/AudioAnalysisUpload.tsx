@@ -2,30 +2,28 @@
 
 import { useState } from "react";
 import {
-  FaCloudUploadAlt,
-  FaMusic,
-  FaSpinner,
-  FaUpload,
-  FaMagic,
   FaExclamationTriangle,
+  FaMagic,
+  FaUpload,
 } from "react-icons/fa";
+import { useStartAnalysis } from "@/lib/queries";
 
 interface AudioAnalysisUploadProps {
   onAnalysisStart?: (jobId: string, stemJobId?: string) => void;
-  onAnalysisComplete: (data: any) => void;
-  projectId?: string; // New prop
+  onAnalysisComplete: (data: unknown) => void;
+  projectId?: string;
 }
 
 export function AudioAnalysisUpload({
   onAnalysisStart,
-  onAnalysisComplete,
   projectId,
 }: AudioAnalysisUploadProps) {
   const [mixFile, setMixFile] = useState<File | null>(null);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [versionName, setVersionName] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const startAnalysis = useStartAnalysis();
 
   const handleAnalyze = async () => {
     if (!mixFile || !referenceFile) return;
@@ -34,42 +32,24 @@ export function AudioAnalysisUpload({
       return;
     }
 
-    setIsAnalyzing(true);
     setError(null);
 
+    const formData = new FormData();
+    formData.append("mix", mixFile);
+    formData.append("reference", referenceFile);
+    if (projectId) {
+      formData.append("project_id", projectId);
+      formData.append("version_name", versionName);
+    }
+
     try {
-      const formData = new FormData();
-      formData.append("mix", mixFile);
-      formData.append("reference", referenceFile);
-      if (projectId) {
-        formData.append("project_id", projectId);
-        formData.append("version_name", versionName);
-      }
-
-      const res = await fetch("http://127.0.0.1:4000/api/analyze", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Upload failed: ${text}`);
-      }
-
-      const data = await res.json();
-      console.log("API Response:", data); // Debug log
-      // New response format: { job_id: "...", stem_job_id: "..." }
+      const data = await startAnalysis.mutateAsync(formData);
       if (data.job_id && onAnalysisStart) {
         onAnalysisStart(data.job_id, data.stem_job_id);
-      } else if (data.error) {
-        throw new Error(data.error);
       }
-
-      // We don't call onAnalysisComplete here anymore, the parent handles it via SSE
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "An error occurred during upload");
-      setIsAnalyzing(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An error occurred during upload";
+      setError(message);
     }
   };
 
@@ -107,9 +87,7 @@ export function AudioAnalysisUpload({
             >
               <FaUpload
                 className={`text-2xl mb-2 ${
-                  mixFile
-                    ? "text-emerald-500"
-                    : "text-[var(--color-text-muted)]"
+                  mixFile ? "text-emerald-500" : "text-[var(--color-text-muted)]"
                 }`}
               />
               <span className="text-sm text-[var(--color-text-muted)] px-2 text-center truncate w-full">
@@ -140,15 +118,11 @@ export function AudioAnalysisUpload({
             >
               <FaUpload
                 className={`text-2xl mb-2 ${
-                  referenceFile
-                    ? "text-blue-500"
-                    : "text-[var(--color-text-muted)]"
+                  referenceFile ? "text-blue-500" : "text-[var(--color-text-muted)]"
                 }`}
               />
               <span className="text-sm text-[var(--color-text-muted)] px-2 text-center truncate w-full">
-                {referenceFile
-                  ? referenceFile.name
-                  : "Click to upload reference"}
+                {referenceFile ? referenceFile.name : "Click to upload reference"}
               </span>
             </div>
           </div>
@@ -179,14 +153,14 @@ export function AudioAnalysisUpload({
 
       <button
         onClick={handleAnalyze}
-        disabled={!mixFile || !referenceFile || isAnalyzing}
+        disabled={!mixFile || !referenceFile || startAnalysis.isPending}
         className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all ${
-          !mixFile || !referenceFile || isAnalyzing
+          !mixFile || !referenceFile || startAnalysis.isPending
             ? "bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] cursor-not-allowed"
             : "bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg hover:scale-[1.02]"
         }`}
       >
-        {isAnalyzing ? (
+        {startAnalysis.isPending ? (
           <>
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
             Uploading...

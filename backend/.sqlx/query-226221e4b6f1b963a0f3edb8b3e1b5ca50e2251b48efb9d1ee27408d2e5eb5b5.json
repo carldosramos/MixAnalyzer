@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT rt.id, rt.file_path \n             FROM reference_tracks rt \n             JOIN analyses a ON a.reference_track_id = rt.id \n             WHERE a.mix_version_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "file_path",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "226221e4b6f1b963a0f3edb8b3e1b5ca50e2251b48efb9d1ee27408d2e5eb5b5"
+}
