@@ -6,6 +6,7 @@ use axum::{
 };
 use axum::response::sse::{Event, KeepAlive};
 use futures::stream::Stream;
+use std::convert::Infallible;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -120,15 +121,15 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root_handler))
         .route("/api/analyze", post(start_analysis_job))
-        .route("/api/jobs/:id", get(job_status_stream))
-        .route("/api/stems/:id", get(stem_job_status_stream))
+        .route("/api/jobs/{id}", get(job_status_stream))
+        .route("/api/stems/{id}", get(stem_job_status_stream))
         .route("/api/projects", get(projects::list_projects).post(projects::create_project))
-        .route("/api/projects/:id", get(projects::get_project))
-        .route("/api/analyses/version/:id", get(projects::get_analysis_by_version))
-        .route("/api/versions/:id", delete(projects::delete_version))
-        .route("/api/versions/:id/files", get(projects::get_version_files))
-        .route("/api/versions/:id/reanalyze", post(reanalyze_version))
-        .route("/api/versions/:id/reanalyze-stems", post(reanalyze_stems_only))
+        .route("/api/projects/{id}", get(projects::get_project))
+        .route("/api/analyses/version/{id}", get(projects::get_analysis_by_version))
+        .route("/api/versions/{id}", delete(projects::delete_version))
+        .route("/api/versions/{id}/files", get(projects::get_version_files))
+        .route("/api/versions/{id}/reanalyze", post(reanalyze_version))
+        .route("/api/versions/{id}/reanalyze-stems", post(reanalyze_stems_only))
         // Serve static files from uploads directory (includes stems)
         .nest_service("/uploads", tower_http::services::ServeDir::new(&upload_dir_for_serve))
         .layer(CorsLayer::permissive())
@@ -467,7 +468,7 @@ fn update_job_status(state: &AppState, job_id: &str, status: JobStatus) {
 async fn job_status_stream(
     Path(job_id): Path<String>,
     State(state): State<AppState>,
-) -> Sse<impl Stream<Item = Result<Event, axum::Error>>> {
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let stream = async_stream::stream! {
         let mut last_status_json = String::new();
 
@@ -512,7 +513,7 @@ async fn job_status_stream(
 async fn stem_job_status_stream(
     Path(stem_job_id): Path<String>,
     State(state): State<AppState>,
-) -> Sse<impl Stream<Item = Result<Event, axum::Error>>> {
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let stream = async_stream::stream! {
         let mut last_status_json = String::new();
 
