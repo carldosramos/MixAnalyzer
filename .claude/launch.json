@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Next.js)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:front"],
+      "port": 3000
+    },
+    {
+      "name": "Backend (Rust/Axum)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:back"],
+      "port": 4000
+    }
+  ]
+}

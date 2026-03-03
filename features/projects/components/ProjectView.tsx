@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import {
   FaArrowLeft,
   FaHistory,
@@ -8,74 +8,60 @@ import {
   FaFileAudio,
   FaTrash,
   FaRedo,
+  FaSpinner,
 } from "react-icons/fa";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { AudioAnalysisUpload } from "../../audio-analysis/components/AudioAnalysisUpload";
 import { LoadingAnalysis } from "../../audio-analysis/components/LoadingAnalysis";
 import { MixComparisonReport } from "../../audio-analysis/components/MixComparisonReport";
+import {
+  useProject,
+  useAnalysis,
+  useDeleteVersion,
+  useReanalyze,
+  useReanalyzeStems,
+  queryKeys,
+} from "@/lib/queries";
 
 interface ProjectViewProps {
   projectId: string;
 }
 
-interface MixVersion {
-  id: string;
-  version_name: string;
-  created_at: string;
-  stem_job_id?: string;
-}
-
-interface ReferenceTrack {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-interface ProjectDetails {
-  project: {
-    id: string;
-    name: string;
-    created_at: string;
-  };
-  versions: MixVersion[];
-  references: ReferenceTrack[];
-}
-
 export function ProjectView({ projectId }: ProjectViewProps) {
-  const [projectData, setProjectData] = useState<ProjectDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  // Analysis State
+  // Job tracking
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [stemJobId, setStemJobId] = useState<string | null>(null);
   const stemJobIdRef = useRef<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+
+  // Which historical version is selected (drives useAnalysis)
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+
+  // Fresh analysis result coming directly from SSE completion
+  const [freshAnalysis, setFreshAnalysis] = useState<{
+    metrics: unknown;
+    analysis_text: string;
+  } | null>(null);
+
+  // Needed for re-analyze / refresh-stems actions
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null);
 
-  // Delete confirmation state
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
-    null
-  );
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchProjectDetails();
-  }, [projectId]);
+  // Queries
+  const { data: projectData, isLoading } = useProject(projectId);
+  const analysisQuery = useAnalysis(selectedVersionId);
 
-  const fetchProjectDetails = async () => {
-    try {
-      const res = await fetch(
-        `http://127.0.0.1:4000/api/projects/${projectId}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setProjectData(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch project details", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Mutations
+  const deleteVersion = useDeleteVersion(projectId);
+  const reanalyze = useReanalyze();
+  const reanalyzeStems = useReanalyzeStems();
+
+  // Derived display value — fresh SSE result takes precedence over cached query
+  const analysisResult = freshAnalysis ?? analysisQuery.data ?? null;
+  const isLoadingAnalysis = analysisQuery.isLoading && !!selectedVersionId && !freshAnalysis;
 
   const handleAnalysisStart = (jobId: string, stemId?: string) => {
     setActiveJobId(jobId);
@@ -85,53 +71,27 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     }
   };
 
-  const handleAnalysisComplete = (data: any) => {
-    setAnalysisResult(data);
+  const handleAnalysisComplete = (data: { metrics: unknown; analysis_text: string }) => {
+    setFreshAnalysis(data);
     setActiveJobId(null);
-    // Ensure stemJobId state is set from ref
     if (stemJobIdRef.current) {
       setStemJobId(stemJobIdRef.current);
     }
-    // Refresh project data to show new version in list
-    fetchProjectDetails();
+    // Refresh version list to include the newly created version
+    queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
   };
 
-  const handleVersionClick = async (versionId: string) => {
-    // If we're confirming a delete, don't navigate
+  const handleVersionClick = (versionId: string) => {
     if (confirmingDeleteId) {
       setConfirmingDeleteId(null);
       return;
     }
-
-    // Find the version to get its stem_job_id
-    const selectedVersion = projectData?.versions.find(
-      (v: any) => v.id === versionId
-    );
-    const storedStemJobId = selectedVersion?.stem_job_id || null;
-
-    // Set stemJobId from stored version data
-    stemJobIdRef.current = storedStemJobId;
-    setStemJobId(storedStemJobId);
+    const selected = projectData?.versions.find((v) => v.id === versionId);
+    stemJobIdRef.current = selected?.stem_job_id ?? null;
+    setStemJobId(selected?.stem_job_id ?? null);
     setCurrentVersionId(versionId);
-
-    try {
-      const res = await fetch(
-        `http://127.0.0.1:4000/api/analyses/version/${versionId}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data) {
-          setAnalysisResult({
-            metrics: data.metrics,
-            analysis_text: data.ai_report,
-          });
-        } else {
-          alert("No analysis found for this version.");
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch analysis", error);
-    }
+    setFreshAnalysis(null);
+    setSelectedVersionId(versionId);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, versionId: string) => {
@@ -140,26 +100,10 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     setConfirmingDeleteId(versionId);
   };
 
-  const handleConfirmDelete = async (
-    e: React.MouseEvent,
-    versionId: string
-  ) => {
+  const handleConfirmDelete = async (e: React.MouseEvent, versionId: string) => {
     e.stopPropagation();
     e.preventDefault();
-
-    try {
-      const res = await fetch(
-        `http://127.0.0.1:4000/api/versions/${versionId}`,
-        {
-          method: "DELETE",
-        }
-      );
-      if (res.ok) {
-        fetchProjectDetails();
-      }
-    } catch (error) {
-      console.error("Failed to delete version", error);
-    }
+    await deleteVersion.mutateAsync(versionId);
     setConfirmingDeleteId(null);
   };
 
@@ -171,71 +115,32 @@ export function ProjectView({ projectId }: ProjectViewProps) {
 
   const handleReAnalyze = async () => {
     if (!currentVersionId) return;
+    const data = await reanalyze.mutateAsync(currentVersionId);
+    if (data.error) return;
+    setFreshAnalysis(null);
+    setSelectedVersionId(null);
+    if (data.stem_job_id) {
+      stemJobIdRef.current = data.stem_job_id;
+      setStemJobId(data.stem_job_id);
+    }
+    setActiveJobId(data.job_id);
+  };
 
-    try {
-      const res = await fetch(
-        `http://127.0.0.1:4000/api/versions/${currentVersionId}/reanalyze`,
-        { method: "POST" }
-      );
-
-      if (!res.ok) {
-        console.error("Failed to start re-analysis");
-        return;
-      }
-
-      const data = await res.json();
-
-      if (data.error) {
-        console.error("Re-analyze error:", data.error);
-        return;
-      }
-
-      // Clear current results and start loading
-      setAnalysisResult(null);
-
-      // Set up job tracking like a new analysis
-      if (data.stem_job_id) {
-        stemJobIdRef.current = data.stem_job_id;
-        setStemJobId(data.stem_job_id);
-      }
-
-      // Start the loading view with the job ID
-      setActiveJobId(data.job_id);
-    } catch (error) {
-      console.error("Failed to re-analyze", error);
+  const handleRefreshStems = async () => {
+    if (!currentVersionId) return;
+    const data = await reanalyzeStems.mutateAsync(currentVersionId);
+    if (data.stem_job_id) {
+      stemJobIdRef.current = data.stem_job_id;
+      setStemJobId(data.stem_job_id);
     }
   };
 
-  // Refresh stems only (without full re-analysis)
-  const handleRefreshStems = async () => {
-    if (!currentVersionId) return;
-
-    try {
-      const res = await fetch(
-        `http://127.0.0.1:4000/api/versions/${currentVersionId}/reanalyze-stems`,
-        { method: "POST" }
-      );
-
-      if (!res.ok) {
-        console.error("Failed to start stem refresh");
-        return;
-      }
-
-      const data = await res.json();
-
-      if (data.error) {
-        console.error("Stem refresh error:", data.error);
-        return;
-      }
-
-      // Update stem job ID to trigger the StemAnalysisTab to show loading
-      if (data.stem_job_id) {
-        stemJobIdRef.current = data.stem_job_id;
-        setStemJobId(data.stem_job_id);
-      }
-    } catch (error) {
-      console.error("Failed to refresh stems", error);
-    }
+  const handleBack = () => {
+    setFreshAnalysis(null);
+    setSelectedVersionId(null);
+    setCurrentVersionId(null);
+    stemJobIdRef.current = null;
+    setStemJobId(null);
   };
 
   if (isLoading) {
@@ -252,35 +157,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     );
   }
 
-  // If viewing a report
-  if (analysisResult) {
-    return (
-      <div className="min-h-screen bg-[var(--color-surface-muted)]">
-        {/* Re-analyze button in header */}
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            onClick={handleReAnalyze}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors shadow-lg"
-          >
-            <FaRedo /> Re-analyze
-          </button>
-        </div>
-        <MixComparisonReport
-          data={analysisResult}
-          stemJobId={stemJobId || undefined}
-          onBack={() => {
-            setAnalysisResult(null);
-            setCurrentVersionId(null);
-            stemJobIdRef.current = null;
-            setStemJobId(null);
-          }}
-          onRefreshStems={handleRefreshStems}
-        />
-      </div>
-    );
-  }
-
-  // If analyzing
+  // SSE-driven loading (new analysis in progress)
   if (activeJobId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--color-surface-muted)]">
@@ -288,6 +165,38 @@ export function ProjectView({ projectId }: ProjectViewProps) {
           jobId={activeJobId}
           stemJobId={stemJobId || undefined}
           onComplete={handleAnalysisComplete}
+        />
+      </div>
+    );
+  }
+
+  // Loading a historical analysis
+  if (isLoadingAnalysis) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-surface-muted)]">
+        <FaSpinner className="animate-spin text-3xl text-emerald-500" />
+      </div>
+    );
+  }
+
+  // Showing analysis report
+  if (analysisResult) {
+    return (
+      <div className="min-h-screen bg-[var(--color-surface-muted)]">
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={handleReAnalyze}
+            disabled={reanalyze.isPending}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors shadow-lg disabled:opacity-50"
+          >
+            <FaRedo /> {reanalyze.isPending ? "Starting..." : "Re-analyze"}
+          </button>
+        </div>
+        <MixComparisonReport
+          data={analysisResult}
+          stemJobId={stemJobId || undefined}
+          onBack={handleBack}
+          onRefreshStems={handleRefreshStems}
         />
       </div>
     );
@@ -348,7 +257,8 @@ export function ProjectView({ projectId }: ProjectViewProps) {
                               onClick={(e) =>
                                 handleConfirmDelete(e, version.id)
                               }
-                              className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                              disabled={deleteVersion.isPending}
+                              className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors disabled:opacity-50"
                             >
                               Yes
                             </button>
